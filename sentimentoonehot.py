@@ -144,5 +144,5 @@ frases_para_avaliar = ["O curso da Stephanie é ótimo"]
 avaliar_frases(frases_para_avaliar, vectorizer, model, stopwords=minhas_stopwords)
 
 # Exemplo 2 de uso da função
-frases_para_avaliar = ["O clima hoje está péssimo"]
+frases_para_avaliar = ["Mas meu humor hoje está péssimo"]
 avaliar_frases(frases_para_avaliar, vectorizer, model, stopwords=minhas_stopwords)
