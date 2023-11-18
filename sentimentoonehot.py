@@ -26,7 +26,7 @@ stopwords = ["o", "a", "os", "as", "e", "é", "um", "mas", "uma", "até", "uns",
 
 # Frase para avaliar
 frase_para_avaliar = """"Embora tenha considerado desistir do estudo em Processamento de Linguagem Natural (PLN) devido à sua complexidade,
-            a experiência transformadora do curso ministrado por Stephanie me surpreendeu positivamente. O conteúdo desafiador foi apresentado de
+            a experiência transformadora da forma como a Stephanie explica me surpreendeu positivamente. O conteúdo desafiador foi apresentado de
             maneira envolvente e acessível, proporcionando não apenas um entendimento mais profundo dos temas intricados, mas também despertando um
             entusiasmo genuíno pelo campo. O curso não apenas superou minhas expectativas, mas também revelou a fascinante interseção entre teoria e
             prática, tornando o aprendizado não apenas educativo, mas também incrivelmente divertido. Quem poderia imaginar que a exploração do PLN se
