@@ -1,10 +1,7 @@
-# Importar bibliotecas necessárias
 import pandas as pd
 import re
+from scipy.sparse import lil_matrix
 from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
 
 # Leitura do arquivo com uma base de dados que diz quais palavras podem ter uma polaridade negativa ou positiva
 file_path = '/content/SentiLex-lem-PT02.txt'
@@ -26,123 +23,63 @@ with open(file_path, 'r', encoding='utf-8') as file:
 # Criar DataFrame
 df = pd.DataFrame(entries, columns=['Lemma', 'POS', 'Target', 'Polarity', 'Annotation'])
 
-# Filtrar apenas as palavras com polaridade positiva ou negativa
-df_filtered = df[(df['Polarity'] == 1) | (df['Polarity'] == -1)]
+# Lista de stopwords comuns em português
+stopwords = ["o", "a", "os", "as", "e", "é", "um", "mas", "uma", "até", "uns", "umas", "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas", "por", "para", "com", "sem", "como", "quando"]
 
-# Importar bibliotecas necessárias
-from sklearn.feature_extraction.text import CountVectorizer
+# Frase para avaliar
+frase_para_avaliar = """"Embora tenha considerado desistir do estudo em Processamento de Linguagem Natural (PLN) devido à sua complexidade,
+            a experiência transformadora do curso ministrado por Stephanie me surpreendeu positivamente. O conteúdo desafiador foi apresentado de
+            maneira envolvente e acessível, proporcionando não apenas um entendimento mais profundo dos temas intricados, mas também despertando um
+            entusiasmo genuíno pelo campo. O curso não apenas superou minhas expectativas, mas também revelou a fascinante interseção entre teoria e
+            prática, tornando o aprendizado não apenas educativo, mas também incrivelmente divertido. Quem poderia imaginar que a exploração do PLN se
+            tornaria uma jornada tão estimulante e recompensadora?"""
 
-# Criar uma representação one-hot encoding para as palavras
-vectorizer = CountVectorizer(binary=True)
-X = vectorizer.fit_transform(df_filtered['Lemma'])
+# Tokenizar a frase e remover stopwords personalizadas
+palavras_tokenizadas = [palavra.lower() for palavra in re.findall(r'\b\w+\b', frase_para_avaliar) if palavra.lower() not in stopwords]
 
-# Adicionar coluna 'Polarity' ao DataFrame one-hot
-df_one_hot = pd.DataFrame(X.toarray(), columns=vectorizer.get_feature_names_out())
-df_one_hot['Polarity'] = df_filtered['Polarity']
+# Criar um dicionário com palavras únicas e atribuir um índice para cada palavra
+vocabulario = {palavra: idx for idx, palavra in enumerate(set(palavras_tokenizadas))}
 
-# Exibir as primeiras linhas da matriz one-hot
-print("Matriz One-Hot Head:")
-print(df_one_hot.head())
+# Criar um vetor one-hot para a frase
+vetor_one_hot = [1 if palavra in palavras_tokenizadas else 0 for palavra in vocabulario]
 
-import numpy as np
+# Imprimir informações sobre cada palavra na frase
+print("\nInformações sobre cada palavra na frase:")
+for palavra, idx in vocabulario.items():
+    polaridade = df[df['Lemma'].str.lower() == palavra]['Polarity'].iloc[0] if not df[df['Lemma'].str.lower() == palavra].empty else 0
+    print(f"Palavra: '{palavra}', Índice: {idx}, Polaridade: {polaridade}")
 
-# ...
+# Calcular a polaridade da frase com base nas polaridades individuais das palavras
+polaridades_individuais = [df[df['Lemma'].str.lower() == palavra]['Polarity'].iloc[0] if not df[df['Lemma'].str.lower() == palavra].empty else 0 for palavra in palavras_tokenizadas]
+polaridade_frase = sum(polaridades_individuais)
 
-# Dividir o conjunto de dados em treino e teste
-X_train, X_test, y_train, y_test = train_test_split(df_one_hot.drop('Polarity', axis=1), df_one_hot['Polarity'], test_size=0.2, random_state=42)
+# Determinar a polaridade da frase
+if polaridade_frase > 0:
+    polaridade_frase = 1
+elif polaridade_frase < 0:
+    polaridade_frase = -1
+else:
+    polaridade_frase = 0
 
-# Garantir que y_train tenha o mesmo conjunto de índices que X_train
-y_train = df_one_hot.loc[X_train.index, 'Polarity']
+# Imprimir o resultado da previsão da frase
+print(f"\nPolaridade da Frase: {polaridade_frase}")
 
-# Verificar e remover valores nulos em X_train e y_train
-X_train = X_train.dropna()
 
-y_train = y_train.loc[X_train.index]
+# Criar um vetor one-hot para a frase usando CountVectorizer
+vectorizer = CountVectorizer(vocabulary=vocabulario, binary=True)
+matriz_one_hot = vectorizer.fit_transform([' '.join(palavras_tokenizadas)])
 
-df_combined = pd.concat([X_train, y_train], axis=1)
-df_combined = df_combined.dropna()
-X_train = df_combined.drop('Polarity', axis=1)
-y_train = df_combined['Polarity']
+# Obter o cabeçalho das palavras
+palavras_header = list(vocabulario.keys())
 
-X_train = X_train.replace([np.inf, -np.inf], np.nan).dropna()
+# Criar uma matriz esparsa com zeros e uns
+matriz_one_hot_sparse = lil_matrix((len(palavras_header), len(palavras_header)), dtype=int)
+matriz_one_hot_sparse.setdiag(1)
 
-from sklearn.svm import SVC
-model = SVC()
-model.fit(X_train, y_train)
+# Criar um DataFrame para imprimir com cabeçalho
+df_matriz_one_hot = pd.DataFrame(matriz_one_hot_sparse.toarray(), columns=palavras_header, index=palavras_header)
 
-# Fazer previsões para palavras individuais
-palavras_para_avaliar = ["ótimo", "ruim"]
+# Imprimir a matriz one-hot esparsa com cabeçalho e diagonal 1
+print("\nMatriz One-Hot Esparsa:")
+print(df_matriz_one_hot)
 
-# Transformar as palavras para avaliar usando o mesmo vetorizador usado no treinamento
-palavras_one_hot = vectorizer.transform(palavras_para_avaliar)
-
-# Converter a representação esparsa para uma matriz densa
-palavras_one_hot_dense = palavras_one_hot.toarray()
-
-# Imprimir informações sobre cada palavra
-for i, palavra in enumerate(palavras_para_avaliar):
-    palavra_one_hot_i = palavras_one_hot_dense[i]
-    # Reshape para garantir que tenha a mesma forma que o treinamento
-    previsao = model.predict(palavra_one_hot_i.reshape(1, -1))
-    print(f"Palavra: '{palavra}' - Previsão: {previsao[0]}")
-
-# ...
-
-# Criar sua própria lista de stopwords personalizada
-minhas_stopwords = ['a', 'à', 'ao','da', 'aos', 'aquela', 'aquelas', 'aquele', 'aqueles', 'aquilo', 'as']
-
-# Adicionar mais palavras se necessário
-
-# Fazer previsões em um conjunto de frases
-frases_para_avaliar = ["O curso da Stephanie é ótimo"]
-frases_para_avaliar_one_hot = vectorizer.transform(frases_para_avaliar)
-
-# Converter a representação esparsa para uma matriz densa
-frases_para_avaliar_dense = frases_para_avaliar_one_hot.toarray()
-
-import re
-
-def avaliar_frases(frases, vectorizer, model, stopwords=[]):
-    for i, frase in enumerate(frases):
-        print(f"Frase: '{frase}'")
-
-        # Tokenizar a frase e remover stopwords personalizadas
-        palavras_tokenizadas = [palavra.lower() for palavra in re.findall(r'\b\w+\b', frase) if palavra.lower() not in stopwords]
-
-        # Inicializar rótulo da frase como positivo
-        rotulo_frase = 'positiva'
-
-        # Verificar cada palavra na frase
-        for palavra in palavras_tokenizadas:
-            # Verificar se a palavra está na base de dados
-            if palavra in vectorizer.get_feature_names_out():
-                # Obter a representação one-hot da palavra
-                palavra_one_hot = vectorizer.transform([palavra])
-
-                # Converter a representação esparsa para uma matriz densa
-                palavra_one_hot_dense = palavra_one_hot.toarray()
-
-                # Fazer a previsão usando o modelo SVM treinado
-                previsao = model.predict(palavra_one_hot_dense)
-
-                # Se a previsão for negativa, atualizar o rótulo da frase
-                if previsao[0] == -1:
-                    rotulo_frase = 'negativa'
-
-                # Imprimir informações sobre a palavra
-                info_palavra = df[df['Lemma'] == palavra]
-                print(f"Palavra: '{palavra}' - Informações: {info_palavra.to_dict(orient='records')}, Previsão: {previsao[0]}")
-            else:
-                print(f"Palavra: '{palavra}' não encontrada na base de dados.")
-
-        # Imprimir o rótulo final da frase
-        print(f"Rótulo da Frase: {rotulo_frase}")
-        print()
-
-# Exemplo 1 de uso da função
-frases_para_avaliar = ["O curso da Stephanie é ótimo"]
-avaliar_frases(frases_para_avaliar, vectorizer, model, stopwords=minhas_stopwords)
-
-# Exemplo 2 de uso da função
-frases_para_avaliar = ["Mas meu humor hoje está péssimo"]
-avaliar_frases(frases_para_avaliar, vectorizer, model, stopwords=minhas_stopwords)
