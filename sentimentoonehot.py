@@ -1,7 +1,5 @@
 import pandas as pd
 import re
-from scipy.sparse import lil_matrix
-from sklearn.feature_extraction.text import CountVectorizer
 
 # Leitura do arquivo com uma base de dados que diz quais palavras podem ter uma polaridade negativa ou positiva
 file_path = '/content/SentiLex-lem-PT02.txt'
@@ -37,40 +35,29 @@ frase_para_avaliar = """"Embora tenha considerado desistir do estudo em Processa
 # Tokenizar a frase e remover stopwords personalizadas
 palavras_tokenizadas = [palavra.lower() for palavra in re.findall(r'\b\w+\b', frase_para_avaliar) if palavra.lower() not in stopwords]
 
-# Criar um dicionário com palavras únicas e atribuir um índice para cada palavra
-vocabulario = {palavra: idx for idx, palavra in enumerate(set(palavras_tokenizadas))}
-
-# Criar um vetor one-hot para a frase
-vetor_one_hot = [1 if palavra in palavras_tokenizadas else 0 for palavra in vocabulario]
-
 # Imprimir informações sobre cada palavra na frase
 print("\nInformações sobre cada palavra na frase:")
-for palavra, idx in vocabulario.items():
-    polaridade = df[df['Lemma'].str.lower() == palavra]['Polarity'].iloc[0] if not df[df['Lemma'].str.lower() == palavra].empty else 0
-    print(f"Palavra: '{palavra}', Índice: {idx}, Polaridade: {polaridade}")
+for palavra in palavras_tokenizadas:
+    idx = df[df['Lemma'].str.lower() == palavra].index[0] if not df[df['Lemma'].str.lower() == palavra].empty else -1
+    polaridade = df.loc[idx, 'Polarity'] if idx != -1 else 0
+    print(f"Palavra: '{palavra}', Polaridade: {polaridade}")
 
-# Calcular a polaridade da frase com base nas polaridades individuais das palavras
-polaridades_individuais = [df[df['Lemma'].str.lower() == palavra]['Polarity'].iloc[0] if not df[df['Lemma'].str.lower() == palavra].empty else 0 for palavra in palavras_tokenizadas]
-polaridade_frase = sum(polaridades_individuais)
+# Verificar se há pelo menos uma palavra negativa na frase
+tem_palavra_negativa = any(df[df['Lemma'].str.lower().isin(palavras_tokenizadas)]['Polarity'].eq(-1))
 
 # Determinar a polaridade da frase
-if polaridade_frase > 0:
-    polaridade_frase = 1
-elif polaridade_frase < 0:
-    polaridade_frase = -1
-else:
-    polaridade_frase = 0
+polaridade_frase = -1 if tem_palavra_negativa else 1
 
 # Imprimir o resultado da previsão da frase
 print(f"\nPolaridade da Frase: {polaridade_frase}")
 
-
 # Criar um vetor one-hot para a frase usando CountVectorizer
-vectorizer = CountVectorizer(vocabulary=vocabulario, binary=True)
+palavras_tokenizadas = [palavra.lower() for palavra in re.findall(r'\b\w+\b', frase_para_avaliar) if palavra.lower() not in stopwords]
+vectorizer = CountVectorizer(vocabulary=set(palavras_tokenizadas), binary=True)
 matriz_one_hot = vectorizer.fit_transform([' '.join(palavras_tokenizadas)])
 
 # Obter o cabeçalho das palavras
-palavras_header = list(vocabulario.keys())
+palavras_header = vectorizer.get_feature_names_out()
 
 # Criar uma matriz esparsa com zeros e uns
 matriz_one_hot_sparse = lil_matrix((len(palavras_header), len(palavras_header)), dtype=int)
@@ -82,4 +69,3 @@ df_matriz_one_hot = pd.DataFrame(matriz_one_hot_sparse.toarray(), columns=palavr
 # Imprimir a matriz one-hot esparsa com cabeçalho e diagonal 1
 print("\nMatriz One-Hot Esparsa:")
 print(df_matriz_one_hot)
-
